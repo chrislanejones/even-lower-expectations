@@ -2,3 +2,11 @@ node_modules
 dist
 .hallmark
 *.log
+dist-kit
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.vercel
+.env*

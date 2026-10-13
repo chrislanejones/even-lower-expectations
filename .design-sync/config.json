@@ -1,0 +1,81 @@
+{
+  "projectId": "ba223313-cd23-42ac-a478-8a077b7516a7",
+  "shape": "package",
+  "pkg": "even-lower-expectations",
+  "globalName": "EvenLowerExpectations",
+  "buildCmd": "pnpm build:kit",
+  "cssEntry": "dist-kit/kit.css",
+  "tsconfig": "tsconfig.kit.json",
+  "componentSrcMap": {
+    "Logo": "src/components/chrome.tsx",
+    "LogoDefs": "src/components/chrome.tsx",
+    "TitleBar": "src/components/chrome.tsx",
+    "WinControls": "src/components/chrome.tsx",
+    "StatusBar": "src/components/chrome.tsx",
+    "Preferences": "src/components/Preferences.tsx",
+    "Matches": "src/components/Matches.tsx",
+    "Squares": "src/components/Squares.tsx",
+    "Welcome": "src/components/Panels.tsx",
+    "Help": "src/components/Panels.tsx",
+    "Message": "src/components/Panels.tsx",
+    "BuddyList": "src/components/Panels.tsx",
+    "Toolbar": "src/components/Shell.tsx",
+    "Channels": "src/components/Shell.tsx",
+    "Taskbar": "src/components/Shell.tsx"
+  },
+  "dtsPropsFor": {
+    "Matches": "/** \"loading\" shows the dial-up line, \"error\" the lost-connection line. */ status: \"loading\" | \"error\" | \"ready\"; /** compute() output, or SAMPLE_RESULT. null while loading. */ result: { steps: { key: string; label: string; count: number }[]; base: number; matches: number; share: number; oneIn: number; measuredSample: number } | null; seeking: \"women\" | \"men\"; /** The joke line after a lower, or null. Lights the LOWERED pane. */ note: string | null; /** Bump on every filter change to replay the number pop-in. */ rev: number; /** Bump on every lower to replay the LOWERED flash. */ lowers: number; /** false greys out the pink button as \"Nothing left to lower\". */ canLower: boolean; /** Swaps \"Copy link\" to \"Link copied\". */ copied: boolean; onLower: () => void; onReset: () => void; onCopy: () => void;",
+    "Squares": "/** compute() output, or SAMPLE_RESULT. */ result: { steps: { key: string; label: string; count: number }[]; base: number; matches: number; share: number; oneIn: number; measuredSample: number } | null; /** toGroups(result), or SAMPLE_GROUPS. Cells always sum to 1,000. */ groups: { key: \"age\" | \"race\" | \"married\" | \"parent\" | \"income\" | \"height\" | \"body\" | \"match\"; label: string; people: number; cells: number }[]; seeking: \"women\" | \"men\"; /** Group key being hovered; dims every other color. */ active: string | null; setActive: (key: string | null) => void;",
+    "BuddyList": "result: { steps: { key: string; label: string; count: number }[]; base: number; matches: number; share: number; oneIn: number; measuredSample: number } | null; /** toGroups(result), or SAMPLE_GROUPS. */ groups: { key: \"age\" | \"race\" | \"married\" | \"parent\" | \"income\" | \"height\" | \"body\" | \"match\"; label: string; people: number; cells: number }[]; seeking: \"women\" | \"men\"; /** Group key being hovered; highlights its row. Share with Squares. */ active: string | null; setActive: (key: string | null) => void; canLower: boolean; onLower: () => void;",
+    "Preferences": "/** DEFAULTS.men, DEFAULTS.women, or SAMPLE_FILTERS. */ filters: { seeking: \"women\" | \"men\"; ageMin: number; ageMax: number; heightMin: number; heightMax: number; minIncomeK: number; excludeMarried: boolean; excludeParents: boolean; excludeOverweight: boolean; excludeObese: boolean; races: (0 | 1 | 2 | 3)[] }; /** Receives the whole next filters object. Picking a sex resets to that sex's DEFAULTS. */ onChange: (f: { seeking: \"women\" | \"men\"; ageMin: number; ageMax: number; heightMin: number; heightMax: number; minIncomeK: number; excludeMarried: boolean; excludeParents: boolean; excludeOverweight: boolean; excludeObese: boolean; races: (0 | 1 | 2 | 3)[] }) => void;",
+    "TitleBar": "/** A small glyph or swatch before the title, e.g. <span className=\"tb-icon\">\u2699</span>. */ icon?: React.ReactNode; title: React.ReactNode; /** id for aria-labelledby on the window. */ titleId?: string; /** Which boxes to draw, left to right. Default [\"min\",\"max\",\"close\"]. */ controls?: (\"min\" | \"max\" | \"close\" | \"help\")[];",
+    "WinControls": "/** Default [\"min\",\"max\",\"close\"]. */ controls?: (\"min\" | \"max\" | \"close\" | \"help\")[];",
+    "Welcome": "/** Three reality-check percentages per sex, e.g. { men: [\"16%\",\"25%\",\"0.97%\"], women: [\"5.0%\",\"13%\",\"7.2%\"] }. Each card shows the set for the sex in its photo. null shows \"\u2026\". */ shares: { men: string[]; women: string[] } | null; /** Bump every ~13s to rotate the photos. */ tick: number; /** Short date for the banner, e.g. \"Oct 12\". */ today: string; canLower: boolean; copied: boolean; onLower: () => void; onCopy: () => void; onReset: () => void;",
+    "Channels": "/** Id of the window most on screen: \"welcome\" | \"prefs\" | \"matches\" | \"chart\" | \"help\". */ win: string;",
+    "Taskbar": "/** Id of the window most on screen: \"welcome\" | \"prefs\" | \"matches\" | \"chart\" | \"help\". */ win: string; /** Tray time, e.g. \"11:34 PM\". */ clock: string;",
+    "Help": "/** Formatted CPS sample size, e.g. formatCount(103285). */ cpsSampled: string; /** Formatted NHANES sample size, e.g. formatCount(6235). */ nhMeasured: string;",
+    "LogoDefs": "",
+    "Message": ""
+  },
+  "overrides": {
+    "Help": {
+      "cardMode": "column"
+    },
+    "Squares": {
+      "cardMode": "column",
+      "viewport": "900x760"
+    },
+    "Welcome": {
+      "cardMode": "column",
+      "viewport": "1000x820"
+    },
+    "Toolbar": {
+      "cardMode": "column",
+      "viewport": "1200x260"
+    },
+    "Taskbar": {
+      "cardMode": "single",
+      "primaryStory": "AtTheBottom",
+      "viewport": "900x120"
+    },
+    "Matches": {
+      "cardMode": "column",
+      "viewport": "900x760"
+    },
+    "Preferences": {
+      "cardMode": "column",
+      "viewport": "900x1000"
+    },
+    "BuddyList": {
+      "cardMode": "column",
+      "viewport": "900x560"
+    },
+    "StatusBar": {
+      "cardMode": "column"
+    },
+    "TitleBar": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

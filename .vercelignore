@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-kit
+.ds-sync
+ds-bundle
+.design-sync
+.hallmark
+*.log
+.env*

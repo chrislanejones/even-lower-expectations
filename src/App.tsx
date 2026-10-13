@@ -1,73 +1,148 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AGE_MAX, AGE_MIN, HEIGHT_MAX, HEIGHT_MIN,
-  compute, DEFAULTS, formatCount, formatShare, lowerExpectations, type Filters,
+  compute, DEFAULTS, formatCount, formatShare, lowerExpectations, OPEN, toGroups, type Filters, type Seeking,
 } from "./calc";
-import { TvIcon } from "./components/TvIcon";
-import { Controls } from "./components/Controls";
-import { Funnel } from "./components/Funnel";
-import { Screen } from "./components/Screen";
+import { LogoDefs } from "./components/chrome";
+import { Matches } from "./components/Matches";
+import { BuddyList, Help, Message, Welcome } from "./components/Panels";
+import { Preferences } from "./components/Preferences";
+import { Channels, Taskbar, Toolbar } from "./components/Shell";
+import { Squares } from "./components/Squares";
+import { VideoAd } from "./components/VideoAd";
 import { useSurveyData } from "./data";
 import { fromHash, toHash } from "./urlState";
 
 const initialFilters = (): Filters => fromHash(window.location.hash) ?? DEFAULTS.men;
 
-// No standards at all: the base for the hero's reality checks.
-const OPEN: Filters = {
-  ...DEFAULTS.men, ageMin: AGE_MIN, ageMax: AGE_MAX, heightMin: HEIGHT_MIN, heightMax: HEIGHT_MAX,
-  excludeMarried: false, excludeParents: false, excludeOverweight: false, excludeObese: false, minIncomeK: 0, races: [],
+// The "reality check" headlines on the Welcome window: no standards except the ones named.
+// One set per sex; each card shows the set matching its photo.
+const OPEN_W: Filters = { ...OPEN, seeking: "women" };
+const CHECK_FILTERS: Record<Seeking, Filters[]> = {
+  men: [
+    { ...OPEN, heightMin: 72 },
+    { ...OPEN, minIncomeK: 100 },
+    { ...OPEN, excludeMarried: true, heightMin: 72, minIncomeK: 100 },
+  ],
+  women: [
+    { ...OPEN_W, heightMin: 68 },
+    { ...OPEN_W, minIncomeK: 100 },
+    { ...OPEN_W, excludeMarried: true, ageMax: 29, excludeOverweight: true, excludeObese: true },
+  ],
 };
-const CHECKS: { label: string; f: Filters }[] = [
-  { label: "of American men are 6 feet or taller", f: { ...OPEN, heightMin: 72 } },
-  { label: "of American men earn $100k or more", f: { ...OPEN, minIncomeK: 100 } },
-  { label: "of men are single, 6 feet, and make $100k", f: { ...OPEN, excludeMarried: true, heightMin: 72, minIncomeK: 100 } },
+
+// Keyword box: first matching pattern wins. "lower" runs the button instead of jumping.
+const KEYWORDS: [RegExp, string][] = [
+  [/lower|expect/, "lower"],
+  [/number|standard|pref|calc|match|result|odds|read|mail/, "calculator"],
+  [/square|chart|where|went/, "squares"],
+  [/buddy|buddies|people|chat/, "buddies"],
+  [/help|math|how|method|data|source/, "method"],
+  [/home|welcome|top|start/, "top"],
 ];
+
+const clockText = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+const todayText = () => new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+function jump(id: string) {
+  const el = document.getElementById(id);
+  if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 12, behavior: "smooth" });
+}
 
 export default function App() {
   const data = useSurveyData();
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [note, setNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const screenRef = useRef<HTMLDivElement>(null);
-  const [screenVisible, setScreenVisible] = useState(true);
+  const [rev, setRev] = useState(0);
+  const [lowers, setLowers] = useState(0);
+  const [active, setActive] = useState<string | null>(null);
+  const [win, setWin] = useState("welcome");
+  const [keyword, setKeyword] = useState("");
+  const [showChannels, setShowChannels] = useState(true);
+  const [tick, setTick] = useState(0);
+  const [clock, setClock] = useState(clockText);
 
   const ready = data.status === "ready";
-  const result = useMemo(
-    () => (ready ? compute(filters, data.cps, data.nh) : null),
-    [ready, filters, data],
-  );
-  const checks = useMemo(
-    () => (ready ? CHECKS.map((c) => ({ ...c, share: compute(c.f, data.cps, data.nh).share })) : null),
+  const result = useMemo(() => (ready ? compute(filters, data.cps, data.nh) : null), [ready, filters, data]);
+  const groups = useMemo(() => (result ? toGroups(result) : []), [result]);
+  const nextLower = useMemo(() => (ready ? lowerExpectations(filters, data.cps, data.nh) : null), [ready, filters, data]);
+  const shares = useMemo(
+    () =>
+      ready
+        ? {
+            men: CHECK_FILTERS.men.map((f) => formatShare(compute(f, data.cps, data.nh).share)),
+            women: CHECK_FILTERS.women.map((f) => formatShare(compute(f, data.cps, data.nh).share)),
+          }
+        : null,
     [ready, data],
-  );
-  const nextLower = useMemo(
-    () => (ready ? lowerExpectations(filters, data.cps, data.nh) : null),
-    [ready, filters, data],
   );
 
   useEffect(() => {
     history.replaceState(null, "", toHash(filters));
   }, [filters]);
 
+  // Photo rotation and the taskbar clock.
   useEffect(() => {
-    const el = screenRef.current;
-    if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(([entry]) => setScreenVisible(entry.isIntersecting), { threshold: 0.15 });
-    io.observe(el);
-    return () => io.disconnect();
+    const photos = setInterval(() => setTick((t) => t + 1), 13000);
+    const clockTimer = setInterval(() => setClock(clockText()), 20000);
+    return () => {
+      clearInterval(photos);
+      clearInterval(clockTimer);
+    };
+  }, []);
+
+  // Windows fade up as they scroll in, and the taskbar tracks the one most on screen.
+  useEffect(() => {
+    document.documentElement.classList.add("reveal-on");
+    const reveal = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    if (!("IntersectionObserver" in window)) {
+      reveal.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add("is-in");
+          io.unobserve(e.target);
+        }
+      }),
+      { threshold: 0.08, rootMargin: "0px 0px -6% 0px" },
+    );
+    reveal.forEach((el) => io.observe(el));
+    const fallback = setTimeout(() => reveal.forEach((el) => el.classList.add("is-in")), 1200);
+
+    const ratios: Record<string, number> = {};
+    const winIo = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => (ratios[(e.target as HTMLElement).dataset.win ?? ""] = e.intersectionRatio));
+        const best = Object.entries(ratios).sort((a, b) => b[1] - a[1])[0];
+        if (best && best[1] > 0) setWin(best[0]);
+      },
+      { threshold: [0, 0.2, 0.4, 0.6, 0.8, 1] },
+    );
+    document.querySelectorAll("[data-win]").forEach((el) => winIo.observe(el));
+    return () => {
+      io.disconnect();
+      winIo.disconnect();
+      clearTimeout(fallback);
+    };
   }, []);
 
   const change = (f: Filters) => {
     setFilters(f);
     setNote(null);
     setCopied(false);
+    setRev((r) => r + 1);
   };
 
-  const lower = () => {
-    if (!nextLower) return;
+  const lower = (): boolean => {
+    if (!nextLower) return false;
     setFilters(nextLower.filters);
     setNote(nextLower.note);
     setCopied(false);
+    setRev((r) => r + 1);
+    setLowers((n) => n + 1);
+    return true;
   };
 
   const copy = async () => {
@@ -79,158 +154,101 @@ export default function App() {
     }
   };
 
+  const keywordSubmit = () => {
+    const k = keyword.trim().toLowerCase();
+    const hit = KEYWORDS.find(([re]) => re.test(k));
+    if (!hit) {
+      setNote(k ? `Keyword "${k}" not found. Try "lower".` : 'Type a keyword first. Try "lower".');
+      jump("calculator");
+      return;
+    }
+    if (hit[1] === "lower") {
+      if (!lower()) setNote("Nothing left to lower. You did it.");
+      jump("calculator");
+      return;
+    }
+    jump(hit[1]);
+  };
+
   return (
-    <>
+    <div className="aol">
+      <LogoDefs />
       <a className="skip" href="#calculator">Skip to the calculator</a>
-      <header className="masthead">
-        <a className="wordmark" href="#top" aria-label="Even Lower Expectations, home">
-          <TvIcon className="wordmark-tv" />
-          <span>Even Lower Expectations</span>
-        </a>
-        <nav aria-label="Page">
-          <a href="#funnel-title">The squares</a>
-          <a href="#method">How it works</a>
-        </nav>
-      </header>
+      <Toolbar
+        showChannels={showChannels}
+        onToggleChannels={() => setShowChannels((s) => !s)}
+        keyword={keyword}
+        onKeyword={setKeyword}
+        onKeywordSubmit={keywordSubmit}
+        onLower={() => lower()}
+        onCopy={copy}
+        copied={copied}
+      />
 
-      <main id="top">
-        <section className="intro">
-          <div className="intro-copy">
-            <h1>
-              Find the one.
-              <br />
-              Then lower the{" "}
-              <span className="bar-word">
-                bar.
-                <svg className="bar-sag" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-                  <path d="M2 3C30 19 70 19 98 8" />
-                </svg>
-              </span>
-            </h1>
-            <p className="lede">
-              Set your standards and see how many real people in the US actually meet them. The numbers come from
-              the 2026 Census Bureau survey and the newest NCHS health exam data. When the answer stings, hit the
-              pink button.
-            </p>
-            <a className="btn btn-ink" href="#calculator">Run the numbers</a>
-          </div>
+      <main className="mdi" data-chan={showChannels ? "on" : "off"}>
+        {showChannels && <Channels win={win} />}
 
-          <aside className="checks" aria-labelledby="checks-title">
-            <p className="checks-title" id="checks-title">Reality checks</p>
-            <ol className="checks-list">
-              {CHECKS.map((c, i) => (
-                <li key={c.label}>
-                  <span className="checks-num">{checks ? formatShare(checks[i].share) : "…"}</span>
-                  <span className="checks-label">{c.label}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="checks-src">All adults. Census 2026 and NHANES 2021–23.</p>
-          </aside>
-        </section>
+        <div className="mdi-center">
+          <Welcome
+            shares={shares}
+            tick={tick}
+            today={todayText()}
+            canLower={!!nextLower}
+            copied={copied}
+            onLower={() => lower()}
+            onCopy={copy}
+            onReset={() => change(DEFAULTS[filters.seeking])}
+          />
 
-        <section className="workbench" id="calculator" aria-label="Calculator">
-          <Controls filters={filters} onChange={change} />
-          <div className="workbench-screen" ref={screenRef}>
-            <Screen
+          <section id="calculator" className="calculator ele-reveal" data-reveal="" aria-label="Calculator">
+            <Preferences filters={filters} onChange={change} />
+            <div className="matches-col">
+            <Matches
+              status={data.status}
               result={result}
               seeking={filters.seeking}
-              status={data.status}
               note={note}
+              rev={rev}
+              lowers={lowers}
               canLower={!!nextLower}
-              onLower={lower}
+              copied={copied}
+              onLower={() => lower()}
               onReset={() => change(DEFAULTS[filters.seeking])}
               onCopy={copy}
-              copied={copied}
             />
-          </div>
-        </section>
-
-        {result && <Funnel result={result} seeking={filters.seeking} />}
-
-        <section className="method" id="method" aria-labelledby="method-title">
-          <div className="section-head">
-            <h2 id="method-title">How the math works</h2>
-            <p>Two federal surveys, one assumption, no made-up numbers.</p>
-          </div>
-
-          <div className="method-grid">
-            <table className="sources">
-              <caption className="sr-only">Data sources</caption>
-              <thead>
-                <tr><th scope="col">Survey</th><th scope="col">Covers</th><th scope="col">Collected</th><th scope="col">Adults</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th scope="row">
-                    <a href="https://www.census.gov/data/datasets/time-series/demo/cps/cps-asec.html">CPS ASEC 2026</a>
-                    <span>US Census Bureau</span>
-                  </th>
-                  <td>Age, race, marriage, kids at home, income</td>
-                  <td>Feb to Apr 2026 · income for 2025</td>
-                  <td className="num">{ready ? formatCount(data.cps.adultsSampled) : "…"}</td>
-                </tr>
-                <tr>
-                  <th scope="row">
-                    <a href="https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2021-2023">NHANES 2021–2023</a>
-                    <span>National Center for Health Statistics</span>
-                  </th>
-                  <td>Measured height and body mass index</td>
-                  <td>Aug 2021 to Aug 2023</td>
-                  <td className="num">{ready ? formatCount(data.nh.adultsMeasured) : "…"}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="method-notes">
-              <p>
-                The Census survey counts people by age, race, marriage, kids and income, weighted up to the whole
-                country. NHANES actually measures people with a tape and a scale, so height and weight come from
-                there. We match the two on sex, age and race, then multiply. That assumes height and weight don't
-                depend on income or marriage once age and race are fixed. It's not perfectly true, and it's the
-                same shortcut the original calculators used.
-              </p>
-              <ul>
-                <li>“Married” means currently married, spouse present or not. Separated and divorced count as single.</li>
-                <li>“Kids” means the person's own child under 18 living in the same home.</li>
-                <li>Income is total personal income for 2025, before tax, from all sources.</li>
-                <li>Hispanic covers any race. White, Black and Asian mean non-Hispanic.</li>
-                <li>Both surveys cap age at 80, so the top of the slider means 80 and older.</li>
-                <li>Results with tiny samples get a warning on the screen. Treat them as vibes.</li>
-              </ul>
+            <VideoAd />
             </div>
-          </div>
-        </section>
-      </main>
+          </section>
 
-      <footer className="footer">
-        <div className="marquee" aria-hidden="true">
-          <div className="marquee-track">
-            {Array.from({ length: 2 }, (_, k) => (
-              <span key={k}>
-                Lowered expectations <i>·</i> even lower <i>·</i> lower than that <i>·</i> lower still <i>·</i>{" "}
-              </span>
-            ))}
-          </div>
+          <Squares result={result} groups={groups} seeking={filters.seeking} active={active} setActive={setActive} />
+          <Help
+            cpsSampled={ready ? formatCount(data.cps.adultsSampled) : "…"}
+            nhMeasured={ready ? formatCount(data.nh.adultsMeasured) : "…"}
+          />
+          <Message />
         </div>
-        <div className="footer-body">
+
+        <BuddyList
+          result={result}
+          groups={groups}
+          seeking={filters.seeking}
+          active={active}
+          setActive={setActive}
+          canLower={!!nextLower}
+          onLower={() => lower()}
+        />
+
+        <footer className="footer">
           <p>
-            A parody tribute to the “Lowered Expectations” sketch from MADtv. Not affiliated with MADtv, Fox, the
+            A parody tribute to the “Lowered Expectations” sketch from MADtv. Not affiliated with MADtv, Fox, AOL, the
             Census Bureau or the CDC. Inspired by <a href="https://realitycalc.com/">realitycalc.com</a> and{" "}
             <a href="https://igotstandardsbro.com/">igotstandardsbro.com</a>, rebuilt on newer data.
           </p>
-          <p className="footer-small">
-            Everything runs in your browser. Nothing you pick is stored or sent anywhere.
-          </p>
-        </div>
-      </footer>
+          <p>Everything runs in your browser. Nothing you pick is stored or sent anywhere. Photos are stand-ins, not survey respondents.</p>
+        </footer>
+      </main>
 
-      {result && !screenVisible && (
-        <a className="mini-readout" href="#calculator">
-          <span className="mini-share">{formatShare(result.share)}</span>
-          <span>of {filters.seeking} fit · see the screen</span>
-        </a>
-      )}
-    </>
+      <Taskbar win={win} clock={clock} />
+    </div>
   );
 }

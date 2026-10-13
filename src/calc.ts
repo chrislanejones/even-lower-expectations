@@ -286,3 +286,49 @@ export function lowerExpectations(f: Filters, cps: CpsData, nh: NhanesData): Rel
   }
   return best;
 }
+
+/** No standards at all: the base for the "reality check" headlines. */
+export const OPEN: Filters = {
+  ...DEFAULTS.men,
+  ageMin: AGE_MIN, ageMax: AGE_MAX, heightMin: HEIGHT_MIN, heightMax: HEIGHT_MAX,
+  excludeMarried: false, excludeParents: false, excludeOverweight: false, excludeObese: false,
+  minIncomeK: 0, races: [],
+};
+
+export interface Group {
+  key: string; // the standard that cut these people, or "match"
+  label: string;
+  people: number;
+  cells: number;
+}
+
+/** Split the population into "cut by step X" groups plus the matches, as `total` squares. */
+export function toGroups(result: Result, total = 1000): Group[] {
+  const { steps } = result;
+  const groups: Group[] = [];
+  for (let i = 1; i < steps.length; i++) {
+    const cut = steps[i - 1].count - steps[i].count;
+    groups.push({ key: steps[i].key, label: steps[i].label, people: Math.max(cut, 0), cells: 0 });
+  }
+  groups.push({ key: "match", label: "Your matches", people: result.matches, cells: 0 });
+  const base = steps[0]?.count || 1;
+
+  // Largest-remainder rounding so the squares always add up to exactly `total`.
+  const raw = groups.map((g) => (g.people / base) * total);
+  groups.forEach((g, i) => (g.cells = Math.floor(raw[i])));
+  let left = total - groups.reduce((n, g) => n + g.cells, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    groups[i].cells++;
+    left--;
+  }
+  // A match smaller than one square still gets one, so it never vanishes.
+  const match = groups[groups.length - 1];
+  if (match.people > 0 && match.cells === 0) {
+    const biggest = groups.reduce((a, b) => (b.cells > a.cells ? b : a));
+    biggest.cells--;
+    match.cells = 1;
+  }
+  return groups;
+}
